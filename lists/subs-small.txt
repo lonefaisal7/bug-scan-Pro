@@ -1,0 +1,11 @@
+www
+api
+ftp
+mail
+dev
+test
+stage
+staging
+admin
+blog
+shop
