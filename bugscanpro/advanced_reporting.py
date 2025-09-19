@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import uuid
-import base64
 
 from rich.console import Console
 from rich.table import Table
@@ -157,38 +156,6 @@ class VulnerabilityAssessment:
                     
                     vulnerabilities.append(vulnerability)
                     break  # Only one pattern per type per target
-        
-        # Port-based vulnerability detection
-        if 'port' in result and result.get('open', False):
-            port = result['port']
-            if port in self.high_risk_ports:
-                vulnerability = {
-                    'id': f"PORT_{port:05d}",
-                    'type': 'exposed_service',
-                    'severity': 'HIGH' if port in [21, 23, 1433, 3306, 3389] else 'MEDIUM',
-                    'description': self.high_risk_ports[port],
-                    'target': hostname,
-                    'port': port,
-                    'confidence': 0.9,
-                    'discovered_at': datetime.utcnow().isoformat()
-                }
-                vulnerabilities.append(vulnerability)
-        
-        # SSL certificate vulnerabilities
-        if result.get('ssl_info'):
-            ssl_info = result['ssl_info']
-            if ssl_info.get('is_expired'):
-                vulnerability = {
-                    'id': f"SSL_EXPIRED_{hash(hostname) % 10000:04d}",
-                    'type': 'expired_certificate',
-                    'severity': 'HIGH',
-                    'description': 'SSL certificate has expired',
-                    'target': hostname,
-                    'expiry_date': ssl_info.get('not_after'),
-                    'confidence': 1.0,
-                    'discovered_at': datetime.utcnow().isoformat()
-                }
-                vulnerabilities.append(vulnerability)
         
         return vulnerabilities
     
@@ -339,7 +306,6 @@ class VulnerabilityAssessment:
     
     def _assess_nist_compliance(self, vulnerabilities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Assess NIST Cybersecurity Framework compliance"""
-        # Similar assessment logic for NIST
         total_vulns = len(vulnerabilities)
         score = max(0, 100 - (total_vulns * 5))
         
@@ -535,12 +501,6 @@ class AdvancedReportGenerator:
             with open(output_file, 'w') as f:
                 json.dump(report, f, indent=2, default=str)
         
-        elif format_type.lower() == 'html':
-            output_file = f"{filename}.html"
-            html_content = self._generate_html_report(report)
-            with open(output_file, 'w') as f:
-                f.write(html_content)
-        
         elif format_type.lower() == 'markdown':
             output_file = f"{filename}.md"
             md_content = self._generate_markdown_report(report)
@@ -552,145 +512,6 @@ class AdvancedReportGenerator:
         
         console.print(f"[green]✅ Executive report exported: {output_file}[/green]")
         return output_file
-    
-    def _generate_html_report(self, report: Dict[str, Any]) -> str:
-        """Generate HTML report"""
-        executive_summary = report.get('executive_summary', {})
-        vulnerability_assessment = report.get('vulnerability_assessment', {})
-        scan_stats = report.get('scan_statistics', {})
-        
-        html_template = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bug Scan Pro - Executive Security Report</title>
-    <style>
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }}
-        .container {{ max-width: 1200px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }}
-        .header {{ text-align: center; margin-bottom: 30px; }}
-        .header h1 {{ color: #2c3e50; font-size: 2.5em; margin: 0; }}
-        .header p {{ color: #7f8c8d; font-size: 1.2em; }}
-        .section {{ margin: 20px 0; padding: 20px; border-left: 4px solid #3498db; background: #f8f9fa; }}
-        .risk-critical {{ border-left-color: #e74c3c; background: #fdf2f2; }}
-        .risk-high {{ border-left-color: #f39c12; background: #fefaf2; }}
-        .risk-medium {{ border-left-color: #f1c40f; background: #fefef2; }}
-        .risk-low {{ border-left-color: #27ae60; background: #f2fdf2; }}
-        .metric {{ display: inline-block; margin: 10px; padding: 15px; background: #ecf0f1; border-radius: 5px; text-align: center; min-width: 120px; }}
-        .metric-value {{ font-size: 1.5em; font-weight: bold; color: #2c3e50; }}
-        .metric-label {{ font-size: 0.9em; color: #7f8c8d; }}
-        .vulnerability-item {{ background: white; margin: 10px 0; padding: 15px; border-radius: 5px; border-left: 4px solid #e74c3c; }}
-        .footer {{ text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ecf0f1; color: #7f8c8d; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
-        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-        th {{ background-color: #f2f2f2; font-weight: bold; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🔍 Bug Scan Pro Executive Report</h1>
-            <p>Professional Security Assessment • Generated {datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}</p>
-            <p><strong>Made with ❤️ by @lonefaisal</strong></p>
-        </div>
-        
-        <div class="section risk-{executive_summary.get('overall_risk_level', 'low').lower()}">
-            <h2>🎯 Executive Summary</h2>
-            <div class="metrics">
-                <div class="metric">
-                    <div class="metric-value">{executive_summary.get('total_vulnerabilities_found', 0)}</div>
-                    <div class="metric-label">Vulnerabilities</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">{executive_summary.get('overall_risk_level', 'Unknown')}</div>
-                    <div class="metric-label">Risk Level</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">{executive_summary.get('scan_success_rate', '0%')}</div>
-                    <div class="metric-label">Success Rate</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">{scan_stats.get('total_targets_scanned', 0)}</div>
-                    <div class="metric-label">Targets Scanned</div>
-                </div>
-            </div>
-            
-            <h3>Key Findings:</h3>
-            <ul>
-        """
-        
-        for finding in executive_summary.get('key_findings', []):
-            html_template += f"<li>{finding}</li>"
-        
-        html_template += """
-            </ul>
-        </div>
-        
-        <div class="section">
-            <h2>📉 Scan Performance Metrics</h2>
-            <table>
-                <tr><th>Metric</th><th>Value</th></tr>
-        """
-        
-        for key, value in scan_stats.items():
-            formatted_key = key.replace('_', ' ').title()
-            html_template += f"<tr><td>{formatted_key}</td><td>{value}</td></tr>"
-        
-        html_template += """
-            </table>
-        </div>
-        
-        <div class="section">
-            <h2>⚠️ Vulnerability Summary</h2>
-        """
-        
-        vuln_summary = vulnerability_assessment.get('risk_summary', {})
-        severity_breakdown = vuln_summary.get('severity_breakdown', {})
-        
-        for severity, count in severity_breakdown.items():
-            if count > 0:
-                html_template += f"""
-                <div class="vulnerability-item">
-                    <strong>{severity}</strong>: {count} vulnerabilities found
-                </div>
-                """
-        
-        html_template += """
-        </div>
-        
-        <div class="section">
-            <h2>🛡️ Recommendations</h2>
-        """
-        
-        for recommendation in vulnerability_assessment.get('recommendations', []):
-            html_template += f"""
-            <div class="vulnerability-item">
-                <h4>{recommendation.get('title', 'Recommendation')}</h4>
-                <p><strong>Priority:</strong> {recommendation.get('priority', 'Medium')}</p>
-                <p><strong>Affected Targets:</strong> {recommendation.get('target_count', 0)}</p>
-                <ul>
-            """
-            
-            for action in recommendation.get('actions', []):
-                html_template += f"<li>{action}</li>"
-            
-            html_template += "</ul></div>"
-        
-        html_template += f"""
-        </div>
-        
-        <div class="footer">
-            <p>🔒 This report was generated by <strong>Bug Scan Pro</strong> - Made with ❤️ by <strong>@lonefaisal</strong></p>
-            <p>📞 Contact: <a href="https://t.me/lonefaisal">@lonefaisal</a> | 📱 Networks: <a href="https://t.me/arrow_network">ARROW</a> | <a href="https://t.me/kmri_network_reborn">KMRI</a></p>
-            <p><small>Report ID: {report.get('report_metadata', {}).get('report_id', 'Unknown')[:12]}...</small></p>
-        </div>
-    </div>
-</body>
-</html>
-        """
-        
-        return html_template
     
     def _generate_markdown_report(self, report: Dict[str, Any]) -> str:
         """Generate Markdown report"""
@@ -835,12 +656,10 @@ if __name__ == "__main__":
         
         # Export in multiple formats
         json_file = await reporter.export_report(report, 'json', 'test_report')
-        html_file = await reporter.export_report(report, 'html', 'test_report')
         md_file = await reporter.export_report(report, 'markdown', 'test_report')
         
         console.print(f"[green]✅ Reports generated:")
         console.print(f"  📄 JSON: {json_file}")
-        console.print(f"  🌐 HTML: {html_file}")
         console.print(f"  📝 Markdown: {md_file}")
         
         # Display executive summary
